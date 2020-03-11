@@ -16,7 +16,7 @@ This application demonstrates two use cases:
 * deploy to Pivotal Cloud Foundry and bind to PCC service instance without any code or configuration change. 
 
 ### Sizer
-A highly extensible GemFire client application which can be used to load sample of data into embedded GemFire instance locally. This is useful to perform PCC capacity analysis and planning without the need to provision PCC service instance first.
+A highly extensible GemFire client application which can be used to load sample of data into GemFire instance locally. This application is useful to estimate PCC capacity without the need to provision PCC service instance first.
 
 ### CI
 `ci` directory contains Dockerfile for GemFire that is version agnostic. Furthermore, a basic example of how to use Concourse pipeline to create GemFire Docker image from Pivotal Network is also provided. 
