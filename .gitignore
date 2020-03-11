@@ -60,3 +60,7 @@ build
 # Concourse files #
 ######################
 credentials.yml
+
+# Concourse files #
+######################
+data
