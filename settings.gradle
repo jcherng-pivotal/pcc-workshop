@@ -1,0 +1,5 @@
+rootProject.name = 'pcc-workshop'
+
+include 'repository'
+include 'client'
+include 'sizer'

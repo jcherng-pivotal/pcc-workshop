@@ -1,0 +1,51 @@
+---
+resource_types:
+  - name: pivnet
+    type: docker-image
+    source:
+      repository: pivotalcf/pivnet-resource
+      tag: latest-final
+
+resources:
+  - name: ci-git
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: ((git-branch))
+      paths:
+        - ci/.concourse/pcc
+
+  - name: pivotal-gemfire-pivnet
+    type: pivnet
+    source:
+      api_token: ((pivnet-api-token))
+      product_slug: pivotal-gemfire
+      product_version: 9\.8\.6
+
+  - name: pivotal-gemfire-docker-image
+    type: docker-image
+    source:
+      repository: 192.168.50.4:5000/pivotal/gemfire
+      insecure_registries:
+        - 192.168.50.4:5000
+
+jobs:
+  - name: publish-pivotal-gemfire-docker-image
+    plan:
+      - aggregate:
+          - get: ci-repo
+            resource: ci-git
+          - get: pivnet
+            resource: pivotal-gemfire-pivnet
+            trigger: true
+      - task: stage-pivnet
+        file: ci-repo/ci/.concourse/pcc/tasks/stage-pivnet.yml
+      - put: pivotal-gemfire-docker-image
+        params:
+          build: .
+          dockerfile: ci-repo/ci/docker/pivotal-gemfire/Dockerfile
+          tag_file: pivotal-gemfire/version
+
+  - name: operation management
+    jobs:
+      - publish-pivotal-gemfire-docker-image

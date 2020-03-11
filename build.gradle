@@ -1,0 +1,72 @@
+buildscript {
+    dependencies {
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:${property('spring-boot.version')}"
+    }
+    repositories {
+        mavenCentral()
+        maven { url 'https://repo.spring.io/plugins-release' }
+    }
+}
+
+allprojects {
+    apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'eclipse'
+    apply plugin: 'idea'
+
+    dependencyManagement {
+        imports {
+            mavenBom(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES)
+        }
+
+        dependencies {
+            dependency "org.springframework.geode:spring-gemfire-starter:${ext['spring-gemfire-starter.version']}"
+
+            /***
+             * overriding GemFire version through dependency management
+             */
+            dependency "io.pivotal.gemfire:geode-core:${ext['gemfire.version']}"
+            dependency "io.pivotal.gemfire:geode-wan:${ext['gemfire.version']}"
+            dependency "io.pivotal.gemfire:geode-lucene:${ext['gemfire.version']}"
+            dependency "io.pivotal.gemfire:geode-cq:${ext['gemfire.version']}"
+
+            /***
+             * springfox-swagger libraries for client & sizer applications
+             */
+            dependency "io.springfox:springfox-swagger2:${ext['springfox-swagger.version']}"
+            dependency "io.springfox:springfox-swagger-ui:${ext['springfox-swagger.version']}"
+
+            /***
+             * random data libraries for sizer application
+             */
+            dependency "com.github.javafaker:javafaker:${ext['javafaker.version']}"
+            dependency "org.jeasy:easy-random-core:${ext['easy-random.version']}"
+            dependency "org.jeasy:easy-random-bean-validation:${ext['easy-random.version']}"
+
+            /***
+             * memory histogram tool
+             */
+            dependency "com.jerolba:jmnemohistosyne:${ext['jmnemohistosyne.version']}"
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    group = 'io.pivotal.workshop.pcc'
+
+    sourceCompatibility = 1.8
+
+    repositories {
+        mavenCentral()
+        maven { url "https://repo.spring.io/libs-release" }
+    }
+    
+    configurations.all {
+        /***
+         * for GemFire version 9.7.0 or lower,
+         * exclude spring-boot-starter-logging to avoid log4j related exceptions
+         */
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+    }
+}

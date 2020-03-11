@@ -1,0 +1,57 @@
+/***
+ * enable spring boot
+ */
+apply plugin: 'org.springframework.boot'
+
+/***
+ * configurations for compileOnly and annotationProcessor
+ * lombok related
+ */
+configurations {
+    developmentOnly
+    runtimeClasspath {
+        extendsFrom developmentOnly
+    }
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+dependencies {
+    annotationProcessor 'org.projectlombok:lombok'
+    compileOnly 'org.projectlombok:lombok'
+
+    /***
+     * include repository module
+     * alo inherit GemFire related transitive dependencies
+     */
+    implementation project(':repository')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    implementation 'io.springfox:springfox-swagger2'
+    implementation 'io.springfox:springfox-swagger-ui'
+
+    /***
+     * random data libraries
+     */
+    implementation 'com.github.javafaker:javafaker'
+    implementation 'org.jeasy:easy-random-core'
+    implementation 'org.jeasy:easy-random-bean-validation'
+
+
+    /***
+     * memory histogram tool
+     */
+    implementation 'com.jerolba:jmnemohistosyne'
+
+    implementation 'org.reflections:reflections:0.9.12'
+
+    testImplementation('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
+}
+
+test {
+    useJUnitPlatform()
+}

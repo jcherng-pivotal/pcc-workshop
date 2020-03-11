@@ -1,0 +1,2 @@
+create disk-store --name=customer --max-oplog-size=1 --dir=./
+create disk-store --name=dummy --max-oplog-size=1 --dir=./

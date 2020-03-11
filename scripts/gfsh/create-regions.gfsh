@@ -1,0 +1,5 @@
+destroy region --name=/customer --if-exists
+destroy region --name=/dummy --if-exists
+
+create region --name=/customer --type=PARTITION_REDUNDANT_PERSISTENT --disk-store=customer --if-not-exists
+create region --name=/dummy --type=PARTITION_REDUNDANT_PERSISTENT --disk-store=dummy --if-not-exists

@@ -1,0 +1,7 @@
+---
+applications:
+- name: pcc-workshop-client
+  memory: 2G
+  services:
+  - pcc-workshop
+  random-route: true

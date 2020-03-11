@@ -1,0 +1,16 @@
+---
+platform: linux
+image_resource:
+  type: docker-image
+  source:
+    repository: starkandwayne/concourse
+    tag: latest
+inputs:
+  - name: ci-repo
+  - name: pivnet
+outputs:
+  - name: pivotal-gemfire
+run:
+  path: /bin/bash
+  args:
+    - ci-repo/ci/.concourse/pcc/tasks/stage-pivnet.sh
