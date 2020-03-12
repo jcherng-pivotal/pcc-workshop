@@ -9,7 +9,7 @@ public class DummyFixedGenerator implements Generator<Dummy> {
     @Override
     public Dummy getObject(int idSeed) {
         return Dummy.builder()
-                .id("C" + idSeed)
+                .id((long) idSeed)
                 .aBoolean(true)
                 .aShort((short) 100)
                 .anInt(100)

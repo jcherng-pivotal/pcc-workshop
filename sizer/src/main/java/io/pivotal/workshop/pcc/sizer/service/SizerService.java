@@ -1,5 +1,6 @@
 package io.pivotal.workshop.pcc.sizer.service;
 
+import edu.princeton.cs.algs4.LinearRegression;
 import io.pivotal.workshop.pcc.sizer.generator.Generator;
 import io.pivotal.workshop.pcc.sizer.generator.GeneratorType;
 import io.pivotal.workshop.pcc.sizer.histogram.LocalServerHistogramer;
@@ -10,10 +11,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.data.gemfire.repository.GemfireRepository;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @AllArgsConstructor
@@ -45,6 +43,18 @@ public class SizerService {
                 : String.format("%.1f EiB", (bytes >> 20) / 0x1p40);
     }
 
+    public void load(GeneratorType generatorType,
+                     RepositoryType repositoryType,
+                     int numberOfRecords) {
+        Generator generator = (Generator) applicationContext
+                .getBean(generatorType.getBeanClass());
+        GemfireRepository repository = (GemfireRepository) applicationContext
+                .getBean(repositoryType.getBeanClass());
+
+        Set<?> objects = generator.getCustomers(numberOfRecords);
+        repository.saveAll(objects);
+    }
+
     public String accurate(GeneratorType generatorType,
                            RepositoryType repositoryType,
                            int numberOfRecords) {
@@ -67,51 +77,28 @@ public class SizerService {
         GemfireRepository repository = (GemfireRepository) applicationContext
                 .getBean(repositoryType.getBeanClass());
 
-        List<Long> resultList = new ArrayList<>();
-        List<Long> memoryList = new ArrayList<>();
+        int round = 5;
+        double[] recordCounts = new double[round];
+        double[] memorySizes = new double[round];
 
-
-        // need to check the math
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < round; i++) {
             log.info("calculation #" + (i + 1));
             int numberOfRecords = (int) Math.pow(2, i) * 500;
             LocalServerHistogramer localServerHistogramer =
                     new LocalServerHistogramer(generator, repository, numberOfRecords);
-            long memory = localServerHistogramer.calculate().getTotalMemory();
+            long memorySize = localServerHistogramer.calculate().getTotalMemory();
 
-            if (i > 0) {
-                int previousNumberOfRecords = (int) Math.pow(2, i - 1) * 500;
-                long previousMemory = memoryList.get(i - 1);
-                resultList.add(solve(previousNumberOfRecords, previousMemory, numberOfRecords, memory, expectedNumberOfRecords));
-            }
-            memoryList.add(memory);
+            recordCounts[i] = (double) numberOfRecords;
+            memorySizes[i] = (double) memorySize;
         }
 
-        long bytes = resultList.stream().min(Comparator.comparing( aLong -> aLong )).get();
-
+        LinearRegression linearRegression = new LinearRegression(recordCounts, memorySizes);
+        long bytes = (long) linearRegression.predict(expectedNumberOfRecords);
         return getResult(bytes);
     }
 
     private String getResult(long bytes) {
         return "total memory - SI: " + humanReadableByteCountSI(bytes) +
                 " BIN: " + humanReadableByteCountBin(bytes);
-    }
-
-    /***
-     * y = ax + b
-     * a = (y2 - y1)/(x2 - x1)
-     * b = y2 - (a * x2)
-     * @param x1 number of records from set 1
-     * @param y1 number of bytes from set 1
-     * @param x2 number of records from set 2
-     * @param y2 number of bytes from set 2
-     * @param expectedNumberOfRecords expected number of records
-     * @return
-     */
-    private long solve(int x1, long y1, int x2, long y2, int expectedNumberOfRecords) {
-        long a = (y2 - y1) / (x2 - x1);
-        long b = y2 - (a * x2);
-
-        return (a * expectedNumberOfRecords) + b;
     }
 }

@@ -46,6 +46,17 @@ allprojects {
              * memory histogram tool
              */
             dependency "com.jerolba:jmnemohistosyne:${ext['jmnemohistosyne.version']}"
+
+            /***
+             * reflection library
+             */
+            dependency "org.reflections:reflections:${ext['reflections.version']}"
+            
+            /***
+             * algorithms library
+             */
+            dependency "edu.princeton.cs:algs4:${ext['algs4.version']}"
+
         }
     }
 }
@@ -60,6 +71,7 @@ subprojects {
     repositories {
         mavenCentral()
         maven { url "https://repo.spring.io/libs-release" }
+        maven { url "https://dl.bintray.com/algs4/maven/" }
     }
     
     configurations.all {

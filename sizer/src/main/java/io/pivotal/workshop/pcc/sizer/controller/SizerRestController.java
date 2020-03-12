@@ -19,6 +19,14 @@ public class SizerRestController {
 
     private final SizerService sizerService;
 
+    @PostMapping("/load")
+    @ResponseStatus(CREATED)
+    public void load(@RequestParam GeneratorType generatorType,
+                           @RequestParam RepositoryType repositoryType,
+                           @RequestParam(defaultValue = "5000") int numberOfRecords) {
+        sizerService.load(generatorType, repositoryType, numberOfRecords);
+    }
+
     @PostMapping("/accurate")
     @ResponseStatus(CREATED)
     public String accurate(@RequestParam GeneratorType generatorType,

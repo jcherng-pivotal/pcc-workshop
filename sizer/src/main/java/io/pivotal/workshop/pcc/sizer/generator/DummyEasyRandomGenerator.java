@@ -16,6 +16,6 @@ public class DummyEasyRandomGenerator implements Generator<Dummy> {
     @Override
     public Dummy getObject(int idSeed) {
         return easyRandom.nextObject(Dummy.class)
-                .toBuilder().id("C" + idSeed).build();
+                .toBuilder().id((long) idSeed).build();
     }
 }

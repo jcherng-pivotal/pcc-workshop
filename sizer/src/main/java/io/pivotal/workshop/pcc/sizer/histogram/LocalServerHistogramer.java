@@ -3,6 +3,7 @@ package io.pivotal.workshop.pcc.sizer.histogram;
 import com.jerolba.jmnemohistosyne.HistogramEntry;
 import com.jerolba.jmnemohistosyne.MemoryHistogram;
 import io.pivotal.workshop.pcc.sizer.generator.Generator;
+import io.pivotal.workshop.pcc.sizer.repository.SpecialGemfireRepository;
 import io.pivotal.workshop.pcc.sizer.util.GemFireScriptUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.geode.internal.cache.RegionEntry;
@@ -27,30 +28,30 @@ import static java.lang.Long.parseLong;
 @Slf4j
 public class LocalServerHistogramer {
     private final Set<String> specialClasses;
-    private final Set<String> includedClasses;
     private final Set<String> excludedClasses;
-    private final Generator generator;
-    private final GemfireRepository repository;
-    private final int numberOfRecords;
+    private final SpecialGemfireRepository repository;
+    private final Set<?> records;
 
     public LocalServerHistogramer(Generator generator, GemfireRepository repository, int numberOfRecords) {
-        this.generator = generator;
-        this.repository = repository;
-        this.numberOfRecords = numberOfRecords;
-        // data related classes
-        Reflections reflections = new Reflections("org.apache.geode.internal.cache.entries");
+        this.repository = SpecialGemfireRepository.getInstance(repository);
+        this.records = generator.getCustomers(numberOfRecords);
 
+        // data related classes
+        // do we need to include the classes from the `org.apache.geode.internal.cache.entries`?
+        Reflections reflections = new Reflections("org.apache.geode.internal.cache.entries");
         specialClasses = reflections
                 .getSubTypesOf(RegionEntry.class)
                 .stream()
                 .map(Class::getCanonicalName)
                 .collect(Collectors.toSet());
+
         specialClasses.add("[B");
         specialClasses.add("org.apache.geode.internal.cache.PreferBytesCachedDeserializable");
         specialClasses.add("org.apache.geode.internal.cache.DiskId$PersistenceWithIntOffset");
 
-        includedClasses = new HashSet<>();
         excludedClasses = new HashSet<>();
+
+        stabilize();
     }
 
     private void resetGemFire() {
@@ -68,56 +69,58 @@ public class LocalServerHistogramer {
     }
 
     private void stabilize() {
+        log.info("stabilizing classes for memory calculation");
         resetGemFire();
-        Set<?> objects = generator.getCustomers(1000);
-        repository.saveAll(objects);
-        repository.deleteAll(objects);
-
         IntStream.range(0, 5).forEach(value -> {
-            load((value + 1) * 1000);
+            load();
+            unload();
         });
-        unload();
+        log.info("stabilized classes for memory calculation");
     }
 
-    private MemoryHistogram load(int numberOfRecords) {
+    private MemoryHistogram load() {
         MemoryHistogram reference = createHistogram();
-        Set<?> objects = generator.getCustomers(numberOfRecords);
-        repository.saveAll(objects);
+        repository.saveAll(records);
         return stabilizeClasses(reference, INCREASE);
     }
 
     private MemoryHistogram unload() {
         MemoryHistogram reference = createHistogram();
-        repository.deleteAll(repository.findAll());
+        repository.deleteAll();
         return stabilizeClasses(reference, DECREASE);
     }
 
     public MemoryHistogram calculate() {
-        stabilize();
-
-        MemoryHistogram base = getBaseMemoryHistogram();
-        MemoryHistogram change = load(numberOfRecords);
-        unload();
-        return diff(base, change);
+        MemoryHistogram result = null;
+        log.info("loading data and calculating memory consumption");
+        while (result == null) {
+            try {
+                MemoryHistogram base = getBaseMemoryHistogram();
+                MemoryHistogram change = load();
+                result = diff(base, change);
+            } catch (CalculationException e) {
+                //NOOP
+                log.error("wrong calculation - retry!");
+            }
+        }
+        return result;
     }
 
     private MemoryHistogram diff(MemoryHistogram base, MemoryHistogram change) {
         MemoryHistogram memoryHistogram = new MemoryHistogram();
-        includedClasses.stream().map(s -> {
-            HistogramEntry baseHistogramEntry = base.get(s);
-            HistogramEntry changeHistogramEntry = change.get(s);
-            if (baseHistogramEntry != null && changeHistogramEntry != null
-                    && baseHistogramEntry.getInstances() < changeHistogramEntry.getInstances()) {
-                long instances = changeHistogramEntry.getInstances() - baseHistogramEntry.getInstances();
-                long size = changeHistogramEntry.getSize() - baseHistogramEntry.getSize();
-                return new HistogramEntry(s, instances, size);
-            } else if(baseHistogramEntry == null && changeHistogramEntry != null){
-                return changeHistogramEntry;
+        change.stream().map(histogramEntry -> {
+            HistogramEntry baseHistogramEntry = base.get(histogramEntry.getClassName());
+            if (baseHistogramEntry != null && baseHistogramEntry.getSize() <= histogramEntry.getSize()) {
+                long instances = histogramEntry.getInstances() - baseHistogramEntry.getInstances();
+                long size = histogramEntry.getSize() - baseHistogramEntry.getSize();
+                return new HistogramEntry(histogramEntry.getClassName(), instances, size);
+            } else if (baseHistogramEntry == null) {
+                return histogramEntry;
             } else {
-                    throw new RuntimeException("wrong calculation!!");
+                throw new CalculationException();
             }
         }).sorted(Comparator.comparingLong(value -> value.getSize()))
-                .collect(Collectors.toList()).forEach(histogramEntry -> memoryHistogram.add(histogramEntry));
+                .collect(Collectors.toList()).forEach(memoryHistogram::add);
 
         return memoryHistogram;
     }
@@ -130,24 +133,19 @@ public class LocalServerHistogramer {
             String className = histogramEntry.getClassName();
             HistogramEntry referenceHistogramEntry = reference.get(className);
 
-            if (specialClasses.contains(className)) {
-                result.add(histogramEntry);
-            }
-
-            if ((referenceHistogramEntry == null && memoryHistogramType == INCREASE) ||
+            if (specialClasses.contains(className) || (referenceHistogramEntry == null && memoryHistogramType == INCREASE) ||
                     (referenceHistogramEntry != null && (
-                            histogramEntry.getInstances() > referenceHistogramEntry.getInstances() && memoryHistogramType == INCREASE ||
-                                    histogramEntry.getInstances() < referenceHistogramEntry.getInstances() && memoryHistogramType == DECREASE
+                            histogramEntry.getSize() > referenceHistogramEntry.getSize() && memoryHistogramType == INCREASE ||
+                                    histogramEntry.getSize() < referenceHistogramEntry.getSize() && memoryHistogramType == DECREASE
                     ))) {
                 if (!excludedClasses.contains(className)) {
-                    includedClasses.add(className);
                     result.add(histogramEntry);
                 }
             } else {
                 excludedClasses.add(className);
-                includedClasses.remove(className);
             }
         });
+
         return result;
     }
 
@@ -196,5 +194,9 @@ public class LocalServerHistogramer {
         }
 
         return pid;
+    }
+
+    private class CalculationException extends RuntimeException {
+
     }
 }

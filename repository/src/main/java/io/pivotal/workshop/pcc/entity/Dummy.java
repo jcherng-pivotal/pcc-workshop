@@ -15,7 +15,7 @@ import org.springframework.data.gemfire.mapping.annotation.Region;
 public class Dummy {
 
     @Id
-    private String id;
+    private Long id;
 
     private boolean aBoolean;
 

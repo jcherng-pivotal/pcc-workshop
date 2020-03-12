@@ -20,7 +20,7 @@ public class DummyJavaFakerGenerator implements Generator<Dummy> {
     @Override
     public Dummy getObject(int idSeed) {
         return Dummy.builder()
-                .id("C" + idSeed)
+                .id((long) idSeed)
                 .aBoolean(faker.bool().bool())
                 .aShort((short) faker.number().numberBetween(0, 100))
                 .anInt(faker.number().randomDigit())
